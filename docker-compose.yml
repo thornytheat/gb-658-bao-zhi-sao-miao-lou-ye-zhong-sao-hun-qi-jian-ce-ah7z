@@ -7,6 +7,9 @@ services:
       APP_VERSION: "SF-2026.11"
       DATABASE_PATH: "/app/data/runs.sqlite3"
       TZ: "Asia/Shanghai"
+      EVIDENCE_ADMIN_TOKEN: "${EVIDENCE_ADMIN_TOKEN:-scanfolio-admin-dev}"
+      EVIDENCE_AUDIT_TOKEN: "${EVIDENCE_AUDIT_TOKEN:-scanfolio-audit-dev}"
+      EVIDENCE_AUDIT_PURPOSES: "${EVIDENCE_AUDIT_PURPOSES:-}"
     volumes:
       - run-data:/app/data
 volumes:

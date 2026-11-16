@@ -14,6 +14,7 @@
 | M4 重扫判定 | 比较扫描候选并保留清晰版本 | POST /api/rescans/evaluate | `app/modules/m4_rescans/similarity.py` `app/modules/m4_rescans/decision.py` | `tests/test_m4_rescans.py` |
 | M5 混期归因 | 用页眉和页码证据裁决混期 | POST /api/mixed/evaluate | `app/modules/m5_mixed/evidence.py` `app/modules/m5_mixed/conflicts.py` | `tests/test_m5_mixed.py` |
 | M6 批次对账 | 检查四账并导出证据 | POST /api/reconcile | `app/modules/m6_batches/compare.py` `app/modules/m6_batches/exporter.py` | `tests/test_m6_batches.py` |
+| M7 证据交付 | 登记原件、按站点裁剪交付、审计查阅记账 | POST /api/evidence/* | `app/modules/m7_evidence/service.py` `app/modules/m7_evidence/materials.py` `app/modules/m7_evidence/access_log.py` | `tests/test_m7_evidence.py` |
 
 ## 陷阱登记
 
@@ -29,12 +30,27 @@
 | TRAP-19 | 候选顺序改变 | 先到者决定保留项 | 显式排序键保持顺序无关 | `app/modules/m3_pages/sequence.py` | `tests/test_m3_pages.py::test_selection_order_independent` |
 | TRAP-22 | 同内容多别名 | 合并顺序改变代表扫描 | 清晰度后以时间和文件名择一 | `app/modules/m4_rescans/decision.py` | `tests/test_m4_rescans.py::test_selection_is_deterministic_on_tie` |
 | TRAP-26 | 陈旧重扫晚提交 | 旧版本覆盖新版 | 版本优先于输入顺序 | `app/modules/m3_pages/sequence.py` | `tests/test_m3_pages.py::test_higher_version_wins_not_later_input` |
+| TRAP-27 | 整包交付含他站原始行 | 一字不动整包下发会泄露别站材料 | 原件完整保留，交付按站点凭据裁剪 | `app/modules/m7_evidence/materials.py` | `tests/test_m7_evidence.py::test_station_delivery_is_clipped_to_own_rows` |
+| TRAP-28 | 删去他站行再交付 | 断掉总包追责依据 | 原始行号与原始文本原样留存，只裁剪视图 | `app/modules/m7_evidence/materials.py` | `tests/test_m7_evidence.py::test_materials_parse_preserves_raw_rows` |
+| TRAP-29 | 审计先出原文后记账 | 记账失败仍泄露整批原件 | 先记账提交，成功后才返回原文 | `app/modules/m7_evidence/service.py` | `tests/test_m7_evidence.py::test_audit_log_failure_returns_no_content` |
+| TRAP-30 | 解除与取件并发 | 解除后才发出的正文无法追回 | 终止标记 + 交付闸门，解除为准 | `app/modules/m7_evidence/auth.py` | `tests/test_m7_evidence.py::test_threaded_termination_beats_concurrent_delivery` |
+| TRAP-31 | 记账中断后重试 | 重复登记或恢复出别的请求 | request_id 唯一，重试复用原账目 | `app/modules/m7_evidence/access_log.py` | `tests/test_m7_evidence.py::test_audit_interruption_resumes_same_request` |
 
 ## 对账规则
 
 - 应有页数 = 唯一采纳页 + 缺页数。
 - 扫描件数 = 唯一采纳 + 被替代重扫 + 混期 + 隔离。
 - 同一输入与规则版本重跑，运行标识和结果行数不变。
+
+## 证据交付规则
+
+- 原件登记只读不删：批次原始文本、原始物理行号、原始字段整体留存，站点交付是过滤视图。
+- 站点交付范围 = 该站凭据对应行的并集；请求中出现不属于本站的行号按越权拒绝。
+- 审计读取 = 整批原件 + 声明用途；每次读取先写查阅账并提交，记账失败不返回原文。
+- 解除合作后旧凭据立即失效，重新合作签发全新凭据，旧摘要永久不可用。
+- 解除与取件并发以解除为准：取件在交付闸门内做最终校验，终止标记可见即拒绝。
+- 审计请求按 request_id 幂等：重试复用原账目，中断后恢复原请求，不重复登记。
+- 采集栏位约定与补扫派工不在本模块改动范围。
 
 ## 已知不覆盖
 
